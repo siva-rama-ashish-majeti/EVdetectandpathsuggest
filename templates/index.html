@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Emergency Vehicle Detector</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), 
+                  url('https://images.unsplash.com/photo-1603252109303-2751441e466b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1650&q=80') no-repeat center center fixed;
+      background-size: cover;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .banner {
+      width: 100%;
+      text-align: center;
+      background: #d32f2f;
+      color: white;
+      padding: 10px;
+      font-weight: bold;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 30px;
+      margin-top: 20px;
+      border-radius: 15px;
+      box-shadow: 0px 0px 15px rgba(0,0,0,0.4);
+      text-align: center;
+      width: 600px;
+      color: white;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .custom-file-upload {
+      display: inline-block;
+      padding: 10px 20px;
+      cursor: pointer;
+      background-color: #d32f2f;
+      color: white;
+      border-radius: 8px;
+      font-weight: bold;
+      border: none;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 10px rgba(211, 47, 47, 0.6);
+    }
+
+    .custom-file-upload:hover {
+      background-color: #b71c1c;
+      transform: scale(1.05);
+    }
+
+    .file-name {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #eee;
+      font-style: italic;
+    }
+
+    button[type="submit"] {
+      padding: 10px 30px;
+      font-size: 16px;
+      background-color: #388e3c;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.3s ease;
+    }
+
+    button[type="submit"]:hover {
+      background-color: #2e7d32;
+    }
+
+    .preview-box {
+      border: 2px dashed #ccc;
+      padding: 20px;
+      margin-top: 20px;
+      height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background-color: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+
+    #map {
+      width: 600px;
+      height: 400px;
+      margin-top: 30px;
+      border-radius: 10px;
+    }
+
+    .label {
+      margin-top: 20px;
+      font-size: 20px;
+      color: #ffeb3b;
+      font-weight: bold;
+    }
+
+    img {
+      max-height: 100%;
+      max-width: 100%;
+    }
+
+    .qr-section {
+      margin-top: 30px;
+      text-align: center;
+      color: white;
+    }
+
+    .qr-section img {
+      width: 200px;
+      margin-top: 10px;
+    }
+
+    #loading {
+      display: none;
+      margin-top: 20px;
+      font-size: 18px;
+      color: #ff5252;
+    }
+  </style>
+</head>
+<body>
+
+<div class="banner">
+  🚨 Live Emergency Detection System 🚒 🚑 🚓
+</div>
+
+<div class="container">
+  <h2>
+    <i class="fas fa-ambulance"></i>
+    <i class="fas fa-fire-extinguisher"></i>
+    <i class="fas fa-shield-alt"></i> 🚑 🔥 🛡️Emergency Vehicle Detector
+  </h2>  
+  <form method="POST" enctype="multipart/form-data">
+    <label for="file-upload" class="custom-file-upload">📁 Choose Image/Video</label>
+    <input id="file-upload" type="file" name="media" accept="image/*,video/*" required onchange="updateFileName()">
+    <div class="file-name" id="file-name">No file chosen</div>
+    <br><br>
+    <button type="submit">🚨 Detect</button>
+  </form>
+
+  <div id="loading">
+    <i class="fas fa-circle-notch fa-spin"></i>
+    Detecting Emergency Vehicles...
+  </div>
+
+  <div class="preview-box">
+    {% if image_path %}
+      <img src="{{ image_path }}">
+    {% else %}
+      <p>Preview will appear here (Image only)</p>
+    {% endif %}
+  </div>
+
+  {% if labels %}
+    <div class="label">
+      {% for label in labels %}
+        {% if label == 'ambulance' %}
+          🚑 Ambulance Detected<br>
+        {% elif label == 'fire_truck' %}
+          🔥 Fire Truck Detected<br>
+        {% elif label == 'police_car' %}
+          🚓 Police Car Detected<br>
+        {% else %}
+          🚨 {{ label|capitalize }} Detected<br>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+{% if vehicle_coords and hospital_coords %}
+<div id="map"></div>
+<script>
+  var vehicleLat = {{ vehicle_coords[0] }};
+  var vehicleLon = {{ vehicle_coords[1] }};
+  var hospitalLat = {{ hospital_coords[0] }};
+  var hospitalLon = {{ hospital_coords[1] }};
+  var hospitalName = "{{ hospital_name }}";
+  var routeGeoJSON = {{ route_geojson|safe }};
+
+  const map = L.map('map').setView([vehicleLat, vehicleLon], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  const redIcon = new L.Icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2966/2966483.png',
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -35]
+  });
+
+  L.marker([vehicleLat, vehicleLon], { icon: redIcon }).addTo(map)
+    .bindPopup("🚨 Emergency Vehicle Location").openPopup();
+
+  L.marker([hospitalLat, hospitalLon]).addTo(map)
+    .bindPopup("🏥 Nearest Hospital:<br>" + hospitalName);
+
+  if (routeGeoJSON) {
+    L.geoJSON(routeGeoJSON, {
+      style: {
+        color: 'blue',
+        weight: 4
+      }
+    }).addTo(map);
+  }
+</script>
+
+{% if qr_path %}
+<div class="qr-section">
+  <h3>📱 Scan QR Code to View Route on Your Phone</h3>
+  <img src="{{ url_for('static', filename='qr.png') }}" alt="QR Code">
+  <p><small>Make sure your phone is on the same Wi-Fi if running locally.</small></p>
+  <p><a href="{{ qr_url }}" target="_blank">🔗 Click to directly refresh</a></p>
+</div>
+{% endif %}
+{% endif %}
+
+<script>
+  function updateFileName() {
+    const input = document.getElementById('file-upload');
+    const fileName = input.files.length > 0 ? input.files[0].name : 'No file chosen';
+    document.getElementById('file-name').textContent = fileName;
+  }
+
+  document.querySelector('form').addEventListener('submit', function () {
+    document.getElementById('loading').style.display = 'block';
+  });
+</script>
+
+</body>
+</html>

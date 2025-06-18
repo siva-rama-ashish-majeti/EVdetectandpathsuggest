@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>View Ambulance Route</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #f4f4f4;
+    }
+    #map {
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+  var vehicleLat = {{ vehicle_coords[0] }};
+  var vehicleLon = {{ vehicle_coords[1] }};
+  var routeGeoJSON = {{ route_geojson | safe }};
+
+  const map = L.map('map').setView([vehicleLat, vehicleLon], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  L.marker([vehicleLat, vehicleLon]).addTo(map)
+    .bindPopup("🚑 Ambulance Location").openPopup();
+
+  if (routeGeoJSON) {
+    L.geoJSON(routeGeoJSON, {
+      style: {
+        color: 'blue',
+        weight: 4
+      }
+    }).addTo(map);
+  } else {
+    alert("⚠️ Route GeoJSON not found.");
+  }
+</script>
+
+</body>
+</html>
